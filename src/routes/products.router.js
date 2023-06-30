@@ -1,5 +1,6 @@
 import { Router } from "express";
-import ProductManager from "../ProductManager.js";
+import { productModel } from "../dao/models/product.model.js";
+import ProductManager from "../dao/ProductManager.js"
 
 const router = Router()
 
@@ -12,24 +13,24 @@ let pan = {title: "Pan", description: "Baguette de pan frances", price: 400, thu
 products.addProduct(pan)
 let productsList = products.getProducts()
 
-router.get("/", (req, res) => {
+router.get("/", async (req, res) => {
     let limit = req.query.limit
+    let products = await productModel.find()
+    let productsLength = await productModel.countDocuments()
     if (!limit) {
-        res.send(productsList)
-    } else if (limit > productsList.length || limit < 1) {
+        res.send(products)
+    } else if (limit > productsLength || limit < 1) {
         res.send(`Cantidad invalida, por favor ingresar un numero entre 1 y ${productsList.length}`)
     } else {
-        let limitedProducts = []
-        for (let index = 0; index < limit; index++) {
-            limitedProducts.push(productsList[index])
-        }
+        let limitedProducts = await productModel.find({}).limit(limit)
         res.send(limitedProducts)
     }
 })
 
-router.get("/:id", (req, res) => {
+router.get("/:id", async (req, res) => {
     let productId = req.params.id
-    let findProduct = productsList.find(p => p.id === parseInt(productId))
+    let findProduct = await productModel.findOne({_id:productId})
+    let productsList = await productModel.find()
     if (!productId) { 
         res.send(productsList) 
     } else {
@@ -37,38 +38,40 @@ router.get("/:id", (req, res) => {
     }
 })
 
-router.post("/", (req, res) => {
+router.post("/", async(req, res) => {
     try {
-        const newProduct = req.body
-        products.addProduct(newProduct.title, newProduct.description, newProduct.price, newProduct.code, newProduct.stock, newProduct.thumnail,)
-        res.status(201).send("Nuevo usuario añadido")
+        const {title, description, price, code, stock, quantity, thumbnail} = req.body
+        let product = await productModel.create({
+            title,
+            description,
+            price,
+            code,
+            stock,
+            quantity,
+            thumbnail
+        })
+        res.send({status:"succes",payload:product})
     } catch (error) {
         console.error(error)
     }
     
 })
 
-router.put('/:id', (req, res) => {
+router.put('/:id', async (req, res) => {
     const id = req.params.id;
     const dataToUpdate = req.body;
-    const product = products.getProductById(id)
-    if(!product){
+    if(!dataToUpdate){
         res.status(404).send('Producto no encontrado');
         return
     }
-    products.updateProduct(id, dataToUpdate.field, dataToUpdate.value)
-    res.send({ product });
+    let result = await productModel.updateOne({_id:id}, dataToUpdate)
+    res.send({status:"succes",payload:result});
 });
 
-router.delete('/:id', (req, res) => {
+router.delete('/:id', async (req, res) => {
     const id = req.params.id;
-    const product = products.getProductById(id)
-    if(!product){
-        res.status(404).send('Producto no encontrado');
-        return
-    }
-    products.deleteProduct(id)
-    res.send({ status: 'success', product });
+    const result = await productModel.deleteOne({_id:id})
+    res.send({status:"succes",payload:result})
 });
 
 export default router;
